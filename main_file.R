@@ -7,54 +7,73 @@ library(gridGraphics)
 ### Fills beds for 6 months. Daily time step
 # nbeds = number of beds in ward
 # los = length of stay (mean, sd) for normal / covid patients
-# cov_curve = changing proportion of patients that are covid+
+# cov_curve = changing NUMBER of patients that are covid+
+# inc_rate = ICNHT data
 
-bed_filling <- function(nbeds, los_norm, los_cov, cov_curve){
+bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 15.7){
   
   ## Normal patients arriving over 6mo
-  A <- as.data.frame(matrix(0,180,3))
-  colnames(A) <- c("day","norm_admin","cov_admin")
+  A <- as.data.frame(matrix(0,180,4))
+  colnames(A) <- c("day","norm_admin","cov_admin","prop_cov")
   A[,"day"] <- seq(1,180,1)
-  A[,"norm_admin"] <- rnorm(180,inc_rate[2],1) #  depends on normal size / LOS of hospital
+  A[,"norm_admin"] <- rnorm(180,inc_rate,1) #  depends on normal size / LOS of hospital
+  A[,"cov_admin"] <- cov_curve
+  A[,"prop_cov"] <- A$cov_admin/A$norm_admin
 
-
-  
-  
-  A <- array(0,c(nbeds,2,180)) # Array - 3D matrix. 
-  colnames(A)<-c("patno","status")
-  #Wn <- array(0,c(nbeds,2,180)) # Array - 3D matrix. 
-  #colnames(Wn)<-c("patno","status")
+  WC <- array(0,c(nbeds,2,180)) # Array - 3D matrix. 
+  colnames(WC)<-c("patno","status")
+  WN <- array(0,c(nbeds,2,180)) # Array - 3D matrix. 
+  colnames(WN)<-c("patno","status")
   # rows = bed, columns = c(patient number, actual status, presumed status, days in hospital), 3D = time
   
   # track number of patients 
   pat_num <- 0
   
+  ###############**********************************************************************
+  ### ICU BEDS ###
+  ###############**********************************************************************
+  
+  ICU_fill <- as.data.frame(matrix(0,180,3)) # Want to know how many enter the ICU each day
+  colnames(ICU_fill) <- c("day","norm","cov")
+  ICU_fill$day <- seq(1,180,1)
+  
   # fill by bed
   for(i in 1:nbeds){
     
     cumlos <- 0
-    
+   
     # first patient in bed
     pat_num <- pat_num + 1
     pat_status <- ifelse(runif(1) < cov_curve[1],1,0) # 1 = COVID positive
     los <- ceiling(ifelse(pat_status == 1, rnorm(1,los_cov), rnorm(1,los_norm)))
     
-    A[i,c("patno","status"),1:los] <- c(pat_num,pat_status)
+    WC[i,c("patno","status"),1:los] <- c(pat_num,pat_status)
     
     cumlos <- cumlos + los
     
+    ICU_fill[1,(pat_status+2)] <- ICU_fill[1,(pat_status+2)] + 1
+    
     while(cumlos < 180){
-      pat_num <- pat_num + 1
-      pat_status <- ifelse(runif(1) < cov_curve[cumlos+1],1,0) # 1 = COVID positive
-      los <- ceiling(ifelse(pat_status == 1, rnorm(1,los_cov), rnorm(1,los_norm)))
+    
+      pat_num <- pat_num + 1 # Next patient
+      pat_status <- ifelse(runif(1) < A$prop_cov[cumlos+1],1,0) # 1 = COVID positive or not (0)?
+      ICU_fill[cumlos,(pat_status+2)] <- ICU_fill[cumlos,(pat_status+2)] + 1 # count to remove from admin
       
-      A[i,c("patno","status"),pmin((cumlos + (1:los)),180)] <- c(pat_num,pat_status)
+      los <- ceiling(ifelse(pat_status == 1, rnorm(1,los_cov), rnorm(1,los_norm))) # length of stay
       
-      cumlos <- cumlos + los
+      WC[i,c("patno","status"),pmin((cumlos + (1:los)),180)] <- c(pat_num,pat_status) # this patient stays until end of los
+      
+      cumlos <- cumlos + los # next new patient at this time point
+      
     }
     
+    
+    
   }
-  return(list(A = A, pat_num = pat_num))
+  
+  
+  
+  return(list(A = A, WC = WC, pat_num = pat_num, ICU_fill = ICU_fill))
   
 }
 
@@ -87,7 +106,7 @@ los_cov <- c(20,8) # GUESS
 cov_curve <- seq(0,0,length.out = 180)
 output_nocovid <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
 
-h_noco <- melt(output_nocovid$A,id.vars = "patno")
+h_noco <- melt(output_nocovid$WC,id.vars = "patno")
 colnames(h_noco) <- c("bedno","variable","time","value")
 h_noco <- dcast(h_noco, time + bedno ~variable)
 ggplot(h_noco, aes(x = time, y = bedno) ) + 
@@ -101,7 +120,7 @@ colnames(pcov)<-c("days","cprev")
 cov_curve <- c(seq(0,0.2,length.out = 100),seq(0.2,0,length.out = 80)) # GUESS
 output_to20 <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
 
-h_to20 <- melt(output_to20$A,id.vars = "patno")
+h_to20 <- melt(output_to20$WC,id.vars = "patno")
 colnames(h_to20) <- c("bedno","variable","time","value")
 h_to20 <- dcast(h_to20, time + bedno ~variable)
 p1 <- ggplot(h_to20, aes(x = time, y = bedno) ) + 
@@ -121,7 +140,7 @@ ggsave(paste0("plots/",nbeds,"_to20.pdf"))
 cov_curve <- c(seq(0,0.8,length.out = 100),seq(0.8,0,length.out = 80)) # GUESS
 output_to80 <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
 
-h_to80 <- melt(output_to80$A,id.vars = "patno")
+h_to80 <- melt(output_to80$WC,id.vars = "patno")
 colnames(h_to80) <- c("bedno","variable","time","value")
 h_to80 <- dcast(h_to80, time + bedno ~variable)
 p1 <- ggplot(h_to80, aes(x = time, y = bedno) ) + 

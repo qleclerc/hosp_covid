@@ -17,7 +17,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 15.7){
   colnames(A) <- c("day","norm_admin","cov_admin","prop_cov")
   A[,"day"] <- seq(1,180,1)
   A[,"norm_admin"] <- ceiling(rnorm(180,inc_rate,1)) #  depends on normal size / LOS of hospital
-  A[,"cov_admin"] <- cov_curve
+  A[,"cov_admin"] <- ceiling(cov_curve)
   A[,"prop_cov"] <- A$cov_admin/(A$norm_admin + A$cov_admin)
   A0 <- A
   
@@ -63,7 +63,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 15.7){
           #print(cumlos)
           ICU_fill[cumlos,(pat_status+2)] <- ICU_fill[cumlos,(pat_status+2)] + 1 # count of filled beds
           A[cumlos, (pat_status+2)] <- A[cumlos, (pat_status+2)] - 1 # remove from admin
-          A$prop_cov <- A$cov_admin / (A$norm_admin + A$cov_admin)
+          A[cumlos,"prop_cov"] <- ifelse((A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"])>0,A[cumlos,"cov_admin"] / (A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"]),0)
           
           los <- ceiling(ifelse(pat_status == 1, rnorm(1,los_cov), rnorm(1,los_norm))) # length of stay
           
@@ -73,7 +73,9 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 15.7){
           
           ICU_fill[cumlos,(pat_status+2)] <- ICU_fill[cumlos,(pat_status+2)] + 1 # count of filled beds
           A[cumlos, (pat_status+2)] <- A[cumlos, (pat_status+2)] - 1 # remove from admin
-          A$prop_cov <- A$cov_admin / (A$norm_admin + A$cov_admin)
+          A[cumlos,"prop_cov"] <- ifelse((A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"])>0,
+                                         A[cumlos,"cov_admin"] / (A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"]),0)
+          
           
           los <- ceiling(ifelse(pat_status == 1, rnorm(1,los_cov), rnorm(1,los_norm))) # length of stay
           
@@ -120,7 +122,7 @@ los_norm <- c(7.9,4) # ICHNT ICU NORMAL LOS
 los_cov <- c(20,8) # GUESS 
 
 # NO COVID
-cov_curve <- 1000*seq(0,0,length.out = 180)
+cov_curve <- 10*seq(0,0,length.out = 180)
 output_nocovid <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
 
 h_noco <- melt(output_nocovid$WC,id.vars = "patno")
@@ -134,7 +136,7 @@ pcov <- as.data.frame(cbind(seq(1,180,1),cov_curve));
 colnames(pcov)<-c("days","cprev")
 
 # Rapid to 20% then decrease
-cov_curve <- 1000*c(seq(0,0.2,length.out = 100),seq(0.2,0,length.out = 80)) # GUESS
+cov_curve <- 10*c(seq(0,0.2,length.out = 100),seq(0.2,0,length.out = 80)) # GUESS
 output_to20 <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
 
 h_to20 <- melt(output_to20$WC,id.vars = "patno")
@@ -150,11 +152,26 @@ pcov$cprev <- cov_curve
 p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() + 
   scale_x_continuous("Day") + scale_y_continuous("COV19 prevelance at entry") 
 
-p1/p2
+# Missing people
+miss_to20 <- melt(output_to20$A[,c("day","norm_admin","cov_admin")], id.vars = "day")
+perc_not_treat <- round(100*output_to20$pat_num/(output_nocovid$pat_num),0)
+
+p3 <- ggplot(miss_to20, aes(fill=variable, y=value, x=day)) + 
+  geom_bar(position="stack", stat="identity") + 
+  scale_fill_discrete(name  ="Status",breaks=c("norm_admin","cov_admin"),labels=c("Normal", "Covid")) +
+  scale_y_continuous("Extra bed space needed") + 
+  scale_x_continuous("Day") + 
+  annotate('text',90, 20, 
+           label=paste("Percentage of normal ICU burden treated:",perc_not_treat,"%"))+ 
+  annotate('text',90, 19, 
+           label=paste("Total missed:",sum(output_to20$A[,c("norm_admin","cov_admin")])))
+
+
+p1/p2+p3
 ggsave(paste0("plots/",nbeds,"_to20.pdf"))
 
 # Rapid to 80% then decrease
-cov_curve <- 1000*c(seq(0,0.8,length.out = 100),seq(0.8,0,length.out = 80)) # GUESS
+cov_curve <- 10*c(seq(0,0.8,length.out = 100),seq(0.8,0,length.out = 80)) # GUESS
 output_to80 <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
 
 h_to80 <- melt(output_to80$WC,id.vars = "patno")
@@ -162,12 +179,29 @@ colnames(h_to80) <- c("bedno","variable","time","value")
 h_to80 <- dcast(h_to80, time + bedno ~variable)
 p1 <- ggplot(h_to80, aes(x = time, y = bedno) ) + 
   geom_point(aes(col = factor(status))) + 
-  scale_colour_discrete(name  ="Status",breaks=c("0", "1"),labels=c("Normal", "Covid")) + 
+  scale_colour_discrete(name  ="Status",breaks=c("0", "1","3"),labels=c("Normal", "Covid","Empty")) + 
   xlab("Day") + ylab("Bed number")
 
 pcov$cprev <- cov_curve
 p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() + 
   scale_x_continuous("Day") + scale_y_continuous("COV19 prevelance at entry")
 
-p1/p2
+# Missing people
+miss_to80 <- melt(output_to80$A[,c("day","norm_admin","cov_admin")], id.vars = "day")
+perc_not_treat <- round(100*output_to80$pat_num/(output_nocovid$pat_num),0)
+
+p3 <- ggplot(miss_to80, aes(fill=variable, y=value, x=day)) + 
+  geom_bar(position="stack", stat="identity") + 
+  scale_fill_discrete(name  ="Status",breaks=c("norm_admin","cov_admin"),labels=c("Normal", "Covid")) +
+  scale_y_continuous("Extra bed space needed") + 
+  scale_x_continuous("Day") + 
+  annotate('text',90, 20, 
+           label=paste("Percentage of normal ICU burden treated:",perc_not_treat,"%"))+ 
+  annotate('text',90, 19, 
+           label=paste("Total missed:",sum(output_to80$A[,c("norm_admin","cov_admin")])))
+
+
+p1/p2+p3
 ggsave(paste0("plots/",nbeds,"_to80.pdf"))
+
+

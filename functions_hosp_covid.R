@@ -5,7 +5,7 @@
 # cov_curve = changing NUMBER of patients that are covid+
 # inc_rate = ICNHT data
 
-bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, ndays = 180){
+bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, ndays = 90){
   
   ## Normal patients arriving over 6mo
   A <- as.data.frame(matrix(0,ndays,4))
@@ -160,7 +160,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
 
 ### Multiple runs
 
-multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, ndays){
+multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, ndays = 90){
   
   h_store<-c()
   missing_store <- c() #matrix(0,100*ndays,5)
@@ -168,7 +168,7 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, ndays){
   max_bed_need <- c()
   
   for(j in 1:nruns){
-    output <- bed_filling(nbeds, los_norm, los_cov, cov_curve,ndays)
+    output <- bed_filling(nbeds, los_norm, los_cov, cov_curve, inc_rate, ndays)
     
     h <- melt(output$WC,id.vars = "patno")
     colnames(h) <- c("bedno","variable","time","value")
@@ -212,6 +212,11 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, ndays){
               bed_store = bed_store, max_bed_need = max_bed_need))
   
 }
+
+sigmoid = function(params, x) {
+  params[1] / (1 + exp(-params[2] * (x - params[3])))
+}
+
 
 #### E.G. PLOT
 
@@ -284,7 +289,7 @@ plot_eg <- function(output, name){
   
 }
 
-plot_multiple <- functions(M,name){
+plot_multiple <- function(M,name){
   
   miss <- M$miss
   miss_month <- M$miss_month

@@ -59,6 +59,12 @@ p11 <- ggplot(miss_noco, aes(x=day, y = m_norm)) +
 
 ggsave(paste0("plots/miss_",nbeds,"_noco.pdf"))
 
+
+## e.g. 
+h_noco <- melt(output_nocovid$WC,id.vars = "patno")
+colnames(h_noco) <- c("bedno","variable","time","value")
+h_noco <- dcast(h_noco, time + bedno ~variable)
+h_noco <- h_noco[-which(h_noco$time == 181),]
 ggplot(h_noco, aes(x = time, y = bedno) ) + 
   geom_point(aes(col = factor(status))) +
   scale_colour_discrete(name  ="Status",breaks=c("0", "1"),labels=c("Normal", "Covid")) 
@@ -94,6 +100,9 @@ ggsave(paste0("plots/miss_",nbeds,"_to20.pdf"))
 h_to20 <- melt(output_to20$WC,id.vars = "patno")
 colnames(h_to20) <- c("bedno","variable","time","value")
 h_to20 <- dcast(h_to20, time + bedno ~variable)
+h_to20 <- h_to20[-which(h_to20$time == 181),]
+
+
 p1 <- ggplot(h_to20, aes(x = time, y = bedno) ) + 
   geom_point(aes(col = factor(status))) + 
   scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
@@ -105,7 +114,7 @@ p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() +
   scale_x_continuous("Day") + scale_y_continuous(lim = c(0,10),"COV19 prevelance at entry") 
 
 # Missing people
-miss_to20 <- melt(output_to20$A[,c("day","norm_admin","cov_admin")], id.vars = "day")
+miss_to20 <- melt(output_to20$Afilled[,c("day","norm_admin","cov_admin")], id.vars = "day")
 perc_not_treat <- round(100*output_to20$pat_num/(output_nocovid$pat_num),0)
 
 p3 <- ggplot(miss_to20, aes(fill=variable, y=value, x=day)) + 
@@ -123,6 +132,22 @@ p3 <- ggplot(miss_to20, aes(fill=variable, y=value, x=day)) +
 
 p1/p2+p3
 ggsave(paste0("plots/",nbeds,"_to20.pdf"))
+
+### Beds needed
+n_to20 <- melt(output_to20$WN,id.vars = "patno")
+colnames(n_to20) <- c("bedno","variable","time","value")
+n_to20 <- dcast(n_to20, time + bedno ~variable)
+n_to20 <- n_to20[-which(n_to20$time == 181),]
+
+ll <- n_to20 %>% group_by(bedno) %>% summarise(mean(patno)) # which beds actually have patients in
+mm <- max(which(ll[,2]>0,arr.ind = TRUE)) # max bed number
+ww <- which(n_to20$bedno <= mm)
+n_to20 <- n_to20[ww,]
+
+ggplot(n_to20, aes(x = time, y = bedno) ) + 
+  geom_point(aes(col = factor(status))) + 
+  scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
+  xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,10))
 
 ####****************************************************************************************************************
 # Rapid to 80% then decrease
@@ -150,6 +175,7 @@ output_to80 <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
 h_to80 <- melt(output_to80$WC,id.vars = "patno")
 colnames(h_to80) <- c("bedno","variable","time","value")
 h_to80 <- dcast(h_to80, time + bedno ~variable)
+h_to80 <- h_to80[-which(h_to80$time == 181),]
 p1 <- ggplot(h_to80, aes(x = time, y = bedno) ) + 
   geom_point(aes(col = factor(status))) + 
   scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
@@ -160,7 +186,7 @@ p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() +
   scale_x_continuous("Day") + scale_y_continuous(lim = c(0,10),"COV19 prevelance at entry")
 
 # Missing people
-miss_to80 <- melt(output_to80$A[,c("day","norm_admin","cov_admin")], id.vars = "day")
+miss_to80 <- melt(output_to80$Afilled[,c("day","norm_admin","cov_admin")], id.vars = "day")
 perc_not_treat <- round(100*output_to80$pat_num/(output_nocovid$pat_num),0)
 
 p3 <- ggplot(miss_to80, aes(fill=variable, y=value, x=day)) + 
@@ -179,7 +205,24 @@ p3 <- ggplot(miss_to80, aes(fill=variable, y=value, x=day)) +
 p1/p2+p3
 ggsave(paste0("plots/",nbeds,"_to80.pdf"))
 
+### Beds needed
+n_to80 <- melt(output_to80$WN,id.vars = "patno")
+colnames(n_to80) <- c("bedno","variable","time","value")
+n_to80 <- dcast(n_to80, time + bedno ~variable)
+n_to80 <- n_to80[-which(n_to80$time == 181),]
 
+ll <- n_to80 %>% group_by(bedno) %>% summarise(mean(patno)) # which beds actually have patients in
+mm <- max(which(ll[,2]>0,arr.ind = TRUE)) # max bed number extra NEEDED
+ww <- which(n_to80$bedno <= mm)
+n_to80 <- n_to80[ww,]
+
+ggplot(n_to80, aes(x = time, y = bedno) ) + 
+  geom_point(aes(col = factor(status))) + 
+  scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
+  xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,100))
+
+
+#####*****************************************************
 # Flattenend
 cov_curve <- 15*dnorm(seq(0,5,length.out = 180), mean = 5, sd = 4)
 output_tofl <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
@@ -197,7 +240,7 @@ p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() +
   scale_x_continuous("Day") + scale_y_continuous(lim = c(0,10),"COV19 prevelance at entry")
 
 # Missing people
-miss_tofl <- melt(output_tofl$A[,c("day","norm_admin","cov_admin")], id.vars = "day")
+miss_tofl <- melt(output_tofl$Afilled[,c("day","norm_admin","cov_admin")], id.vars = "day")
 perc_not_treat <- round(100*output_tofl$pat_num/(output_nocovid$pat_num),0)
 
 p3 <- ggplot(miss_tofl, aes(fill=variable, y=value, x=day)) + 
@@ -215,6 +258,23 @@ p3 <- ggplot(miss_tofl, aes(fill=variable, y=value, x=day)) +
 
 p1/p2+p3
 ggsave(paste0("plots/",nbeds,"_tofl.pdf"))
+
+### Beds needed
+n_tofl <- melt(output_tofl$WN,id.vars = "patno")
+colnames(n_tofl) <- c("bedno","variable","time","value")
+n_tofl <- dcast(n_tofl, time + bedno ~variable)
+n_tofl <- n_tofl[-which(n_tofl$time == 181),]
+
+ll <- n_tofl %>% group_by(bedno) %>% summarise(mean(patno)) # which beds actually have patients in
+mm <- max(which(ll[,2]>0,arr.ind = TRUE)) # max bed number
+ww <- which(n_tofl$bedno <= mm)
+n_tofl <- n_tofl[ww,]
+
+ggplot(n_tofl, aes(x = time, y = bedno) ) + 
+  geom_point(aes(col = factor(status))) + 
+  scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
+  xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,10))
+
 
 #### Number per day
 npd_noco <- h_noco %>% group_by(time,status) %>% summarise(n = n())

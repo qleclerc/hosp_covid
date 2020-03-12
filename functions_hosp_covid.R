@@ -5,20 +5,20 @@
 # cov_curve = changing NUMBER of patients that are covid+
 # inc_rate = ICNHT data
 
-bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
+bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, ndays = 180){
   
   ## Normal patients arriving over 6mo
-  A <- as.data.frame(matrix(0,180,4))
+  A <- as.data.frame(matrix(0,ndays,4))
   colnames(A) <- c("day","norm_admin","cov_admin","prop_cov")
-  A[,"day"] <- seq(1,180,1)
-  A[,"norm_admin"] <- ceiling(rnorm(180,inc_rate,1)) #  depends on normal size / LOS of hospital
+  A[,"day"] <- seq(1,ndays,1)
+  A[,"norm_admin"] <- ceiling(rnorm(ndays,inc_rate,1)) #  depends on normal size / LOS of hospital
   A[,"cov_admin"] <- ceiling(cov_curve)
   A[,"prop_cov"] <- A$cov_admin/(A$norm_admin + A$cov_admin)
   A0 <- A
   
-  WC <- array(0,c(nbeds,2,181)) # Array - 3D matrix. CRITICAL BED DAYS
+  WC <- array(0,c(nbeds,2,(ndays+1))) # Array - 3D matrix. CRITICAL BED DAYS
   colnames(WC)<-c("patno","status")
-  WN <- array(0,c(1000,2,181)) # Array - 3D matrix. NEW BEDS NEEDED
+  WN <- array(0,c(1000,2,(ndays+1))) # Array - 3D matrix. NEW BEDS NEEDED
   colnames(WN)<-c("patno","status")
   # rows = bed, columns = c(patient number, actual status, presumed status, days in hospital), 3D = time
   
@@ -29,9 +29,9 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
   ### ICU BEDS ###
   ###############**********************************************************************
   
-  ICU_fill <- as.data.frame(matrix(0,180,3)) # Want to know how many enter the ICU each day
+  ICU_fill <- as.data.frame(matrix(0,ndays,3)) # Want to know how many enter the ICU each day
   colnames(ICU_fill) <- c("day","norm","cov")
-  ICU_fill$day <- seq(1,180,1)
+  ICU_fill$day <- seq(1,ndays,1)
   
   # fill by bed
   for(i in 1:nbeds){
@@ -53,7 +53,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
     
     cumlos <- cumlos + los
     
-    while(cumlos < 181){
+    while(cumlos < (ndays+1)){
       #print(cumlos)
       
       ### COMPLICATED BY NEED TO HAVE PATIENTS TO ADMIT
@@ -69,7 +69,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
           A[cumlos,"prop_cov"] <- ifelse((A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"])>0,A[cumlos,"cov_admin"] / (A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"]),0)
           
           los <- ceiling(ifelse(pat_status == 1, 
-                                sample(delays, 1, replace = TRUE), #rnorm(1,los_cov), 
+                                sample(los_cov, 1, replace = TRUE), #rnorm(1,los_cov), 
                                 rnorm(1,los_norm))) # length of stay
           
         }else{
@@ -83,7 +83,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
           
           
           los <- ceiling(ifelse(pat_status == 1, 
-                                sample(delays, 10, replace = TRUE),#rnorm(1,los_cov), 
+                                sample(los_cov, 10, replace = TRUE),#rnorm(1,los_cov), 
                                 rnorm(1,los_norm))) # length of stay
           
         }
@@ -93,7 +93,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
         pat_num <- pat_num - 1 # No patient
       }
       
-      WC[i,c("patno","status"),pmin((cumlos + (1:los)),180)] <- c(pat_num,pat_status) # this patient stays until end of los
+      WC[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(pat_num,pat_status) # this patient stays until end of los
       
       cumlos <- cumlos + los # next new patient at this time point
     }
@@ -108,7 +108,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
     cumlos <- 1
     WN[i,c("patno","status"),1] <- c(pat_num+1,3) # First day empty. A > 0 so will have a new patient to admit but not here and now
     
-    while(cumlos < 181){
+    while(cumlos < (ndays + 1)){
       ### COMPLICATED BY NEED TO HAVE PATIENTS TO ADMIT
       if(sum(A[cumlos,c("norm_admin","cov_admin")]) > 0){ # if there is a patient to be admitted
         #print(c(cumlos,pat_status))
@@ -121,7 +121,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
           A[cumlos,"prop_cov"] <- ifelse((A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"])>0,A[cumlos,"cov_admin"] / (A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"]),0)
           
           los <- ceiling(ifelse(pat_status == 1, 
-                                sample(delays, 1, replace = TRUE), #rnorm(1,los_cov), 
+                                sample(los_cov, 1, replace = TRUE), #rnorm(1,los_cov), 
                                 rnorm(1,los_norm))) # length of stay
           
         }else{
@@ -134,7 +134,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
           
           
           los <- ceiling(ifelse(pat_status == 1, 
-                                sample(delays, 10, replace = TRUE),#rnorm(1,los_cov), 
+                                sample(los_cov, 10, replace = TRUE),#rnorm(1,los_cov), 
                                 rnorm(1,los_norm))) # length of stay
           
         }
@@ -144,7 +144,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
         pat_num <- pat_num - 1 # No patient
       }
       
-      WN[i,c("patno","status"),pmin((cumlos + (1:los)),180)] <- c(pat_num,pat_status) # this patient stays until end of los
+      WN[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(pat_num,pat_status) # this patient stays until end of los
       
       cumlos <- cumlos + los # next new patient at this time point
       
@@ -160,20 +160,20 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3){
 
 ### Multiple runs
 
-multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve){
+multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, ndays){
   
   h_store<-c()
-  missing_store <- c() #matrix(0,100*180,5)
+  missing_store <- c() #matrix(0,100*ndays,5)
   bed_store <- c()
   max_bed_need <- c()
   
   for(j in 1:nruns){
-    output <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
+    output <- bed_filling(nbeds, los_norm, los_cov, cov_curve,ndays)
     
     h <- melt(output$WC,id.vars = "patno")
     colnames(h) <- c("bedno","variable","time","value")
     h <- dcast(h, time + bedno ~variable)
-    h <- h[-which(h$time == 181),]
+    h <- h[-which(h$time == (ndays + 1)),]
     
     h_store <- rbind(h_store, cbind(j,h))
     missing_store <- rbind(missing_store, cbind(j,output$Afilled))
@@ -182,14 +182,14 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve){
     n <- melt(output$WN,id.vars = "patno")
     colnames(n) <- c("bedno","variable","time","value")
     n <- dcast(n, time + bedno ~variable)
-    n <- n[-which(n$time == 181),]
+    n <- n[-which(n$time == (ndays+1)),]
     
     ll <- n %>% group_by(bedno) %>% summarise(mean(patno)) # which beds actually have patients in
     mm <- max(which(ll[,2]>0,arr.ind = TRUE)) # max bed number extra NEEDED
     ww <- which(n$bedno <= mm)
     n <- n[ww,]
     
-    bed_store <- rbind(bed_store, n)
+    bed_store <- rbind(bed_store, cbind(j,h))
     max_bed_need <- c(max_bed_need,mm)
     
   }
@@ -210,5 +210,69 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve){
   return(list(missing_store = missing_store, miss_month = miss_month,
               h_store = h_store, miss = miss,
               bed_store = bed_store, max_bed_need = max_bed_need))
+  
+}
+
+#### E.G. PLOT
+
+## e.g.
+
+plot_eg <- function(output, name){
+  
+  # Grab data
+  # Basic time data to ndays days
+  h <- melt(output$WC,id.vars = "patno")
+  colnames(h) <- c("bedno","variable","time","value")
+  h <- dcast(h, time + bedno ~variable)
+  h <- h[-which(h$time == (ndays+1)),]
+  
+  # Plot this
+  p1 <- ggplot(h, aes(x = time, y = bedno) ) + 
+    geom_point(aes(col = factor(status))) + 
+    scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
+    xlab("Day") + ylab("Bed number")
+  
+  
+  pcov$cprev <- cov_curve
+  p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() + 
+    scale_x_continuous("Day") + scale_y_continuous(lim = c(0,10),"COV19 prevelance at entry") 
+  
+  # Missing people
+  miss <- melt(output$Afilled[,c("day","norm_admin","cov_admin")], id.vars = "day")
+  perc_not_treat <- round(100*output$pat_num/(output_nocovid$pat_num),0)
+  
+  p3 <- ggplot(miss, aes(fill=variable, y=value, x=day)) + 
+    geom_bar(position="stack", stat="identity") + 
+    scale_fill_manual(name  ="Status",values=c("norm_admin"="darkgreen","cov_admin" = "red"),labels=c("Normal", "Covid")) +
+    scale_y_continuous("Extra bed space needed") + 
+    scale_x_continuous("Day") + 
+    #annotate(size = 2,'text',90, 20, 
+    # label=paste("Percentage of normal ICU burden treated:",perc_not_treat,"%"))+ 
+    annotate(size = 2,'text',90, 19, 
+             label=paste("Total missed norm:",sum(output$A[,c("norm_admin")]))) +
+    annotate(size = 2,'text',90, 15, 
+             label=paste("Total missed covid:",sum(output$A[,c("cov_admin")])))
+  
+  
+  p1/p2+p3
+  ggsave(paste0("plots/",nbeds,"_",name,".pdf"))
+  
+  ### Beds needed
+  n <- melt(output$WN,id.vars = "patno")
+  colnames(n) <- c("bedno","variable","time","value")
+  n <- dcast(n, time + bedno ~variable)
+  n <- n[-which(n$time == (ndays+1)),]
+  
+  ll <- n %>% group_by(bedno) %>% summarise(mean(patno)) # which beds actually have patients in
+  mm <- max(which(ll[,2]>0,arr.ind = TRUE)) # max bed number
+  ww <- which(n$bedno <= mm)
+  n <- n[ww,]
+  
+  g <- ggplot(n, aes(x = time, y = bedno) ) + 
+    geom_point(aes(col = factor(status))) + 
+    scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
+    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,100))
+  
+  ggsave(paste0("plots/extra_beds_",name,".pdf"))
   
 }

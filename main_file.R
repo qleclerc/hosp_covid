@@ -23,8 +23,8 @@ source("functions_hosp_covid.R")
 # 82.2% full 
 occ_bed_days <- c(0.7,0.822,0.9) * 157 * 180  # number of occupied bed days
 unique_pat <- occ_bed_days / 7.9 
-inc_rate <- unique_pat / 180 # number arrive every day
-inc_rate # mean and range - make norm around mean + 1 SD: 16.3
+inc_rate0 <- unique_pat / 180 # number arrive every day
+inc_rate0 # mean and range - make norm around mean + 1 SD: 16.3
 
 pop_ichnt <- 560600
 ocbeds_peak_wuhan <- 2.6/10000*pop_ichnt# from Lipsitch - but this is number in beds 
@@ -47,7 +47,7 @@ los_cov <- readRDS("delay_dist_linelist.rds") #sample(seq(1,length(x),1), size =
 
 cols <- c("3" = "lightblue", "1" = "red", "0" = "darkgreen")
 
-nruns = 2
+nruns = 100
 
 ndays = 90 # run for 3 months - so much uncertainty ahead
 
@@ -61,24 +61,24 @@ ndays = 90 # run for 3 months - so much uncertainty ahead
 cov_curve <- c(sigmoid(c(15,0.3,30),seq(1,90,1)))
 #plot(cov_curve)
 
-M_wuh <- multiple_runs(nruns, nbeds = 157, los_norm, los_cov, cov_curve, ndays)
+M_wuh <- multiple_runs(nruns, nbeds = 157, los_norm, los_cov, cov_curve, ndays, inc_rate = 16.3)
 plot_multiple(M_wuh,"wuh_ichnt")
 
 M_wuhd <- multiple_runs(nruns, nbeds = 18, los_norm, los_cov, cov_curve, ndays, inc_rate = 1)
-plot_multiple(M_wuhd,"wuh_dev")
+plot_multiple(M_wuhd,"wuh_devon")
 
 M_wuhc <- multiple_runs(nruns, nbeds = 64, los_norm, los_cov, cov_curve, ndays,inc_rate = 7)
 plot_multiple(M_wuhc,"wuh_cuh")
 
 # EG
 output_wuh <- bed_filling(nbeds, los_norm, los_cov, cov_curve,ndays=90)
-plot_eg(output_wuh, "wuh_ichnt")
+plot_eg(output_wuh, "wuh_ichnt", inc_rate = 16.3)
 
 output_wuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
-plot_eg(output_wuh, "wuh_devon")
+plot_eg(output_wuh_devon, "wuh_devon", inc_rate = 1)
 
 output_wuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
-plot_eg(output_wuh, "wuh_cuh")
+plot_eg(output_wuh_cuh, "wuh_cuh", inc_rate = 7)
 
 
 ####****************************************************************************************************************
@@ -103,13 +103,13 @@ plot_multiple(M_dbcuh,"dbwuh_cuh")
 
 # EG
 output_dbwuh <- bed_filling(157, los_norm, los_cov, cov_curve,ndays=90)
-plot_eg(output_dbwuh, "dbwuh")
+plot_eg(output_dbwuh, "dbwuh_ichnt", inc_rate = 16.3)
 
-output_wuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
-plot_eg(output_wuh, "wuh_devon")
+output_dbwuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
+plot_eg(output_dbwuh_devon, "dbwuh_devon", inc_rate = 1)
 
-output_wuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
-plot_eg(output_wuh, "wuh_cuh")
+output_dbwuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
+plot_eg(output_dbwuh_cuh, "dbwuh_cuh", inc_rate = 7)
 
 
 ####****************************************************************************************************************
@@ -127,23 +127,52 @@ plot(cov_curve,ylim=c(0,35),type="l",col="blue",xlab = "Days",ylab = "Daily inci
 lines(sigmoid(c(15,0.3,30),seq(1,90,1)),col="black")
 lines(sigmoid(c(30,0.3,30),seq(1,90,1)),col="red")
 abline(v=c(30,60,90),col="grey")
+abline(h=16.3,col="black",lty="dashed")
 dev.off()
 
 M_slwuh <- multiple_runs(nruns, nbeds, los_norm, los_cov, cov_curve, ndays)
 plot_multiple(M_slwuh,"slwuh_ichnt")
 
-M_dbdev <- multiple_runs(nruns, 18, los_norm, los_cov, cov_curve, ndays,inc_rate = 1)
-plot_multiple(M_dbdev,"slwuh_devon")
+M_sldev <- multiple_runs(nruns, 18, los_norm, los_cov, cov_curve, ndays,inc_rate = 1)
+plot_multiple(M_sldev,"slwuh_devon")
 
-M_dbcuh <- multiple_runs(nruns, 64, los_norm, los_cov, cov_curve, ndays,inc_rate = 7)
-plot_multiple(M_dbcuh,"slwuh_cuh")
+M_slcuh <- multiple_runs(nruns, 64, los_norm, los_cov, cov_curve, ndays,inc_rate = 7)
+plot_multiple(M_slcuh,"slwuh_cuh")
 
 # EG
 output_slwuh <- bed_filling(nbeds, los_norm, los_cov, cov_curve,ndays=90)
-plot_eg(output_slwuh, "slwuh")
+plot_eg(output_slwuh, "slwuh_ichnt", inc_rate = 16.3)
 
-output_wuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
-plot_eg(output_wuh, "wuh_devon")
+output_sldevon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
+plot_eg(output_sldevon, "slwuh_devon", inc_rate = 1)
 
-output_wuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
-plot_eg(output_wuh, "wuh_cuh")
+output_slcuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
+plot_eg(output_slcuh, "slwuh_cuh", inc_rate = 7)
+
+
+#### Table of outputs
+
+names <- c("wuh_ichnt","wuh_devon","wuh_cuh",
+           "dbwuh_ichnt","dbwuh_devon","dbwuh_cuh",
+           "slwuh_ichnt","slwuh_devon","slwuh_cuh")
+
+cc_store <- c()
+ff_store <- c()
+gg_store <- c()
+
+for(i in 1:length(names)){
+  cc <- read.csv(paste0("outputs/",names[i],"_missedpermonth.csv"))[,-1]
+  ff <- read.csv(paste0("outputs/",names[i],"_extrabed.csv"))[,-1]
+  gg <- read.csv(paste0("outputs/",names[i],"_totalmissed.csv"))[,-1]
+  
+  cc_store <- rbind(cc_store, cbind(names[i],cc))
+  ff_store <- rbind(ff_store, c(names[i],ff))
+  gg_store <- rbind(gg_store, c(names[i],gg))
+}
+
+cc_store <- as.data.frame(cc_store)
+ff_store <- as.data.frame(ff_store)
+gg_store <- as.data.frame(gg_store)
+colnames(cc_store) <- c("setting","month","mean_norm","mean_covid")
+colnames(ff_store) <- c("setting","mean_extra","sd_extra")
+colnames(gg_store) <- c("setting","mean_total_norm","sd_total_norm", "mean_total_covid","sd_total_covid")

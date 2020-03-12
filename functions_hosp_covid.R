@@ -7,18 +7,20 @@
 
 bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, ndays = 90){
   
-  ## Normal patients arriving over 6mo
+  ## Admissions 
   A <- as.data.frame(matrix(0,ndays,4))
   colnames(A) <- c("day","norm_admin","cov_admin","prop_cov")
   A[,"day"] <- seq(1,ndays,1)
-  A[,"norm_admin"] <- ceiling(rnorm(ndays,inc_rate,1)) #  depends on normal size / LOS of hospital
+  A[,"norm_admin"] <- ceiling(rnorm(ndays,inc_rate,1)) #  depends on normal number of bed days / LOS of hospital
   A[,"cov_admin"] <- ceiling(cov_curve)
   A[,"prop_cov"] <- A$cov_admin/(A$norm_admin + A$cov_admin)
   A0 <- A
   
-  WC <- array(0,c(nbeds,2,(ndays+1))) # Array - 3D matrix. CRITICAL BED DAYS
+  #CRITICAL BED DAYS
+  WC <- array(0,c(nbeds,2,(ndays+1))) # Array - 3D matrix. 
   colnames(WC)<-c("patno","status")
-  WN <- array(0,c(1000,2,(ndays+1))) # Array - 3D matrix. NEW BEDS NEEDED
+  #NEW BEDS NEEDED
+  WN <- array(0,c(1000,2,(ndays+1))) # Array - 3D matrix. 
   colnames(WN)<-c("patno","status")
   # rows = bed, columns = c(patient number, actual status, presumed status, days in hospital), 3D = time
   
@@ -40,7 +42,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
     
     # first patient in bed
     pat_num <- pat_num + 1
-    if(runif(1) < 0.2){
+    if(runif(1) < 0.2){ # 20% empty beds
       pat_status <- 3 # Empty bed
       los <- 1 # check next day for patient
     }else{
@@ -93,13 +95,18 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
         pat_num <- pat_num - 1 # No patient
       }
       
-      WC[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(pat_num,pat_status) # this patient stays until end of los
+      # If empty bed don't store patient number 
+      if(pat_status == 3){
+        WC[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(0,pat_status) # this patient stays until end of los
+      }else{
+        WC[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(pat_num,pat_status) # this patient stays until end of los
+      }
       
       cumlos <- cumlos + los # next new patient at this time point
     }
     
   }
-  Afilled <- A
+  Aleft <- A
   
   i = 1
   # Extra beds needed
@@ -109,17 +116,19 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
     WN[i,c("patno","status"),1] <- c(pat_num+1,3) # First day empty. A > 0 so will have a new patient to admit but not here and now
     
     while(cumlos < (ndays + 1)){
+    
+      pat_num <- pat_num + 1 # Next patient
+      
       ### COMPLICATED BY NEED TO HAVE PATIENTS TO ADMIT
       if(sum(A[cumlos,c("norm_admin","cov_admin")]) > 0){ # if there is a patient to be admitted
         #print(c(cumlos,pat_status))
-        pat_num <- pat_num + 1 # Next patient
+        
         pat_status <- ifelse(runif(1) < A$prop_cov[cumlos],1,0) # 1 = COVID positive or not (0)?
         
         if(A[cumlos,(pat_status+2)] > 0){ # if there is a patient of this type to be admitted on that day
           
           A[cumlos, (pat_status+2)] <- A[cumlos, (pat_status+2)] - 1 # remove from admin
           A[cumlos,"prop_cov"] <- ifelse((A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"])>0,A[cumlos,"cov_admin"] / (A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"]),0)
-          
           los <- ceiling(ifelse(pat_status == 1, 
                                 sample(los_cov, 1, replace = TRUE), #rnorm(1,los_cov), 
                                 rnorm(1,los_norm))) # length of stay
@@ -131,12 +140,9 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
           A[cumlos, (pat_status+2)] <- A[cumlos, (pat_status+2)] - 1 # remove from admin
           A[cumlos,"prop_cov"] <- ifelse((A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"])>0,
                                          A[cumlos,"cov_admin"] / (A[cumlos,"norm_admin"] + A[cumlos,"cov_admin"]),0)
-          
-          
           los <- ceiling(ifelse(pat_status == 1, 
                                 sample(los_cov, 10, replace = TRUE),#rnorm(1,los_cov), 
                                 rnorm(1,los_norm))) # length of stay
-          
         }
       }else{
         los <- 1
@@ -144,7 +150,12 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
         pat_num <- pat_num - 1 # No patient
       }
       
-      WN[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(pat_num,pat_status) # this patient stays until end of los
+      # If empty bed don't store patient number 
+      if(pat_status == 3){
+        WN[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(0,pat_status) # this patient stays until end of los
+      }else{
+        WN[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(pat_num,pat_status) # this patient stays until end of los
+      }
       
       cumlos <- cumlos + los # next new patient at this time point
       
@@ -154,7 +165,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
   }
   
   
-  return(list(A0 = A0, A = A, Afilled = Afilled, WC = WC, WN = WN, pat_num = pat_num, ICU_fill = ICU_fill))
+  return(list(A0 = A0, A = A, Aleft = Aleft, WC = WC, WN = WN, pat_num = pat_num, ICU_fill = ICU_fill))
   
 }
 
@@ -166,6 +177,8 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate =
   missing_store <- c() #matrix(0,100*ndays,5)
   bed_store <- c()
   max_bed_need <- c()
+  miss_norm <- c()
+  miss_covi <- c()
   
   for(j in 1:nruns){
     output <- bed_filling(nbeds, los_norm, los_cov, cov_curve, inc_rate, ndays)
@@ -176,7 +189,7 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate =
     h <- h[-which(h$time == (ndays + 1)),]
     
     h_store <- rbind(h_store, cbind(j,h))
-    missing_store <- rbind(missing_store, cbind(j,output$Afilled))
+    missing_store <- rbind(missing_store, cbind(j,output$Aleft))
     
     # Extra beds need 
     n <- melt(output$WN,id.vars = "patno")
@@ -185,12 +198,14 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate =
     n <- n[-which(n$time == (ndays+1)),]
     
     ll <- n %>% group_by(bedno) %>% summarise(mean(patno)) # which beds actually have patients in
-    mm <- max(which(ll[,2]>0,arr.ind = TRUE)) # max bed number extra NEEDED
+    mm <- max(which(ll[,2]>0,arr.ind = TRUE)) # max bed number
     ww <- which(n$bedno <= mm)
     n <- n[ww,]
     
-    bed_store <- rbind(bed_store, cbind(j,h))
+    bed_store <- rbind(bed_store, cbind(j,n))
     max_bed_need <- c(max_bed_need,mm)
+    miss_norm <- c(miss_norm, sum(output$Aleft[,c("norm_admin")]))
+    miss_covi <- c(miss_covi, sum(output$Aleft[,c("cov_admin")]))
     
   }
   
@@ -201,15 +216,21 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate =
     summarise(m_norm = mean(norm_admin), m_cov = mean(cov_admin), 
               sd_norm = sd(norm_admin), sd_cov = sd(cov_admin)) 
   
+  
   # mean number missed per day
-  missing_store$month <- rep(1:6,each = 30)
+  missing_store$month <- rep(1:(ndays/30),each = 30)
   miss_month <- missing_store %>% group_by(month) %>% 
     summarise(m_norm = mean(norm_admin), m_cov = mean(cov_admin), 
               sd_norm = sd(norm_admin), sd_cov = sd(cov_admin)) 
   
+  # mean total missed
+  total_missed <- c(mean(miss_norm), sd(miss_norm), 
+                    mean(miss_covi), sd(miss_covi))
+  
   return(list(missing_store = missing_store, miss_month = miss_month,
               h_store = h_store, miss = miss,
-              bed_store = bed_store, max_bed_need = max_bed_need))
+              bed_store = bed_store, max_bed_need = max_bed_need,
+              total_missed = total_missed))
   
 }
 
@@ -222,7 +243,7 @@ sigmoid = function(params, x) {
 
 ## e.g.
 
-plot_eg <- function(output, name){
+plot_eg <- function(output, name, inc_rate){
   
   # Grab data
   # Basic time data to ndays days
@@ -240,31 +261,34 @@ plot_eg <- function(output, name){
   
   pcov <- as.data.frame(cbind(seq(1,length(cov_curve),1),cov_curve));
   colnames(pcov)<-c("days","cprev")
-
+  
   p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() + 
     scale_x_continuous("Day") + scale_y_continuous("COV19 prevelance at entry") +
-    geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")
+    geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed") + 
+    geom_hline(yintercept = inc_rate) + 
+    annotate(size = 2,'text',10, inc_rate+0.1, 
+             label=paste("Normal incidence rate (per day):",inc_rate))
   
   # Missing people
-  miss <- melt(output$Afilled[,c("day","norm_admin","cov_admin")], id.vars = "day")
+  miss <- melt(output$Aleft[,c("day","norm_admin","cov_admin")], id.vars = "day")
   perc_not_treat <- round(100*output$pat_num/(output_nocovid$pat_num),0)
   
   p3 <- ggplot(miss, aes(fill=variable, y=value, x=day)) + 
     geom_bar(position="stack", stat="identity") + 
     scale_fill_manual(name  ="Status",values=c("norm_admin"="darkgreen","cov_admin" = "red"),labels=c("Normal", "Covid")) +
-    scale_y_continuous("Extra bed space needed") + 
+    scale_y_continuous("Extra bed space needed per day") + 
     scale_x_continuous("Day") + 
     #annotate(size = 2,'text',90, 20, 
     # label=paste("Percentage of normal ICU burden treated:",perc_not_treat,"%"))+ 
     annotate(size = 2,'text',10, 19, 
-             label=paste("Total missed norm:",sum(output$Afilled[,c("norm_admin")]))) +
+             label=paste("Total missed norm:",sum(output$Aleft[,c("norm_admin")]))) +
     annotate(size = 2,'text',10, 15, 
-             label=paste("Total missed covid:",sum(output$Afilled[,c("cov_admin")]))) +
+             label=paste("Total missed covid:",sum(output$Aleft[,c("cov_admin")]))) +
     geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")
   
   
   p2/p1+p3
-  ggsave(paste0("plots/",nbeds,"_",name,".pdf"))
+  ggsave(paste0("plots/eg_",name,".pdf"))
   
   ### Beds needed
   n <- melt(output$WN,id.vars = "patno")
@@ -280,7 +304,7 @@ plot_eg <- function(output, name){
   g <- ggplot(n, aes(x = time, y = bedno) ) + 
     geom_point(aes(col = factor(status))) + 
     scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
-    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,100)) +
+    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,200)) +
     annotate(size = 2,'text',10, 15, 
              label=paste("Extra beds needed:",mm)) +
     geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")
@@ -297,14 +321,19 @@ plot_multiple <- function(M,name){
   p11 <- ggplot(miss, aes(x=day, y = m_norm)) + 
     geom_ribbon(aes(ymin = m_norm - sd_norm, ymax = m_norm + sd_norm), fill = "grey70") +
     geom_line(aes(y = m_norm)) + 
-    annotate(size = 2,'text',(15 + 30*c(0,1,2,3,4,5)), -1, 
+    annotate(size = 2,'text',(15 + 30*c(0,1,2)), -1, 
              label=paste("Av. miss. norm:",round(miss_month$m_norm,0))) + 
-    annotate(size = 2,'text',(15 + 30*c(0,1,2,3,4,5)), -2, 
+    annotate(size = 2,'text',(15 + 30*c(0,1,2)), -2, 
              label=paste("Av. miss. covid:",round(miss_month$m_cov,0))) +
     annotate(size = 2,'text',30, 12, 
              label=paste("Extra beds needed:",round(mean(M$max_bed_need),0),
                          "SD (",round(sd(M$max_bed_need),0),")"))
   
-  ggsave(paste0("plots/miss_",nbeds,"_",name,".pdf"))
+  ggsave(paste0("plots/miss_",name,".pdf"))
   
+  stm <- cbind(seq(1,3,1),cbind(round(miss_month$m_norm,0),round(miss_month$m_cov,0)))
+  write.csv(stm, paste0("outputs/",name,"_missedpermonth.csv"))
+  
+  write.csv(c(round(mean(M$max_bed_need),0),round(sd(M$max_bed_need),0)),paste0("outputs/",name,"_extrabed.csv"))
+  write.csv(M$total_missed, paste0("outputs/",name,"_totalmissed.csv"))
 }

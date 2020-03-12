@@ -230,12 +230,15 @@ plot_eg <- function(output, name){
   p1 <- ggplot(h, aes(x = time, y = bedno) ) + 
     geom_point(aes(col = factor(status))) + 
     scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
-    xlab("Day") + ylab("Bed number")
+    xlab("Day") + ylab("Bed number") +
+    geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")
   
-  
-  pcov$cprev <- cov_curve
+  pcov <- as.data.frame(cbind(seq(1,length(cov_curve),1),cov_curve));
+  colnames(pcov)<-c("days","cprev")
+
   p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() + 
-    scale_x_continuous("Day") + scale_y_continuous(lim = c(0,10),"COV19 prevelance at entry") 
+    scale_x_continuous("Day") + scale_y_continuous("COV19 prevelance at entry") +
+    geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")
   
   # Missing people
   miss <- melt(output$Afilled[,c("day","norm_admin","cov_admin")], id.vars = "day")
@@ -248,13 +251,14 @@ plot_eg <- function(output, name){
     scale_x_continuous("Day") + 
     #annotate(size = 2,'text',90, 20, 
     # label=paste("Percentage of normal ICU burden treated:",perc_not_treat,"%"))+ 
-    annotate(size = 2,'text',90, 19, 
-             label=paste("Total missed norm:",sum(output$A[,c("norm_admin")]))) +
-    annotate(size = 2,'text',90, 15, 
-             label=paste("Total missed covid:",sum(output$A[,c("cov_admin")])))
+    annotate(size = 2,'text',10, 19, 
+             label=paste("Total missed norm:",sum(output$Afilled[,c("norm_admin")]))) +
+    annotate(size = 2,'text',10, 15, 
+             label=paste("Total missed covid:",sum(output$Afilled[,c("cov_admin")]))) +
+    geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")
   
   
-  p1/p2+p3
+  p2/p1+p3
   ggsave(paste0("plots/",nbeds,"_",name,".pdf"))
   
   ### Beds needed
@@ -271,8 +275,31 @@ plot_eg <- function(output, name){
   g <- ggplot(n, aes(x = time, y = bedno) ) + 
     geom_point(aes(col = factor(status))) + 
     scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
-    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,100))
+    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,100)) +
+    annotate(size = 2,'text',10, 15, 
+             label=paste("Extra beds needed:",mm)) +
+    geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")
   
   ggsave(paste0("plots/extra_beds_",name,".pdf"))
+  
+}
+
+plot_multiple <- functions(M,name){
+  
+  miss <- M$miss
+  miss_month <- M$miss_month
+  
+  p11 <- ggplot(miss, aes(x=day, y = m_norm)) + 
+    geom_ribbon(aes(ymin = m_norm - sd_norm, ymax = m_norm + sd_norm), fill = "grey70") +
+    geom_line(aes(y = m_norm)) + 
+    annotate(size = 2,'text',(15 + 30*c(0,1,2,3,4,5)), -1, 
+             label=paste("Av. miss. norm:",round(miss_month$m_norm,0))) + 
+    annotate(size = 2,'text',(15 + 30*c(0,1,2,3,4,5)), -2, 
+             label=paste("Av. miss. covid:",round(miss_month$m_cov,0))) +
+    annotate(size = 2,'text',30, 12, 
+             label=paste("Extra beds needed:",round(mean(M$max_bed_need),0),
+                         "SD (",round(sd(M$max_bed_need),0),")"))
+  
+  ggsave(paste0("plots/miss_",nbeds,"_",name,".pdf"))
   
 }

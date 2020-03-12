@@ -94,39 +94,105 @@ ndays = 90 # run for 3 months - so much uncertainty ahead
 ####****************************************************************************************************************
 ### WUHAN LIKE
 ## peak at 15 patients per day
-## peak flat over a month
+## peak remains flat
 sigmoid = function(params, x) {
   params[1] / (1 + exp(-params[2] * (x - params[3])))
 }
-
-cov_curve <- 10 * dnorm(seq(0,1.5,length.out = 40), mean = 1, sd = 0.2)
 x <- seq(0,90,1)
-plot(x,sigmoid(c(15,0.3,30),x), ylim = c(0,35))
-cov_curve <- c(sigmoid(c(15,0.3,30),seq(1,90,1)))
 
-plot(cov_curve)
+cov_curve <- c(sigmoid(c(15,0.3,30),seq(1,90,1)))
+#plot(cov_curve)
 
 M_wuh <- multiple_runs(nruns, nbeds, los_norm, los_cov, cov_curve, ndays)
 
-miss_to20 <- M_to20$miss
-miss_to20_month <- M_to20$miss_month
-
-p11 <- ggplot(miss_to20, aes(x=day, y = m_norm)) + 
-  geom_ribbon(aes(ymin = m_norm - sd_norm, ymax = m_norm + sd_norm), fill = "grey70") +
-  geom_line(aes(y = m_norm)) + 
-  annotate(size = 2,'text',(15 + 30*c(0,1,2,3,4,5)), -1, 
-           label=paste("Av. miss. norm:",round(miss_to20_month$m_norm,0))) + 
-  annotate(size = 2,'text',(15 + 30*c(0,1,2,3,4,5)), -2, 
-           label=paste("Av. miss. covid:",round(miss_to20_month$m_cov,0))) +
-  annotate(size = 2,'text',30, 8, 
-           label=paste("Extra beds needed:",round(mean(M_to20$max_bed_need),0),
-                       "SD (",round(sd(M_to20$max_bed_need),0),")"))
-
-ggsave(paste0("plots/miss_",nbeds,"_to20.pdf"))
+plot_multple(M_wuh,"wuh_ichnt")
 
 # EG
-output_to20 <- bed_filling(nbeds, los_norm, los_cov, cov_curve)
-plot_eg(output_to20, "to20")
+output_wuh <- bed_filling(nbeds, los_norm, los_cov, cov_curve,ndays=90)
+plot_eg(output_wuh, "wuh_ichnt")
+
+output_wuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
+plot_eg(output_wuh, "wuh_devon")
+
+output_wuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
+plot_eg(output_wuh, "wuh_cuh")
+
+
+####****************************************************************************************************************
+####****************************************************************************************************************
+####****************************************************************************************************************
+####****************************************************************************************************************
+### DOUBLE PEAK HEIGHT OF WUHAN
+## peak at 15 patients per day
+## peak remains flat 
+cov_curve <- c(sigmoid(c(30,0.3,30),seq(1,90,1)))
+#plot(cov_curve)
+#lines(sigmoid(c(15,0.3,30),seq(1,90,1)))
+
+M_dbwuh <- multiple_runs(nruns, 157, los_norm, los_cov, cov_curve, ndays)
+
+plot_multple(M_dbwuh,"wuh_ichnt")
+
+M_dbdev <- multiple_runs(nruns, 18, los_norm, los_cov, cov_curve, ndays,inc_rate = 1)
+plot_multple(M_dbdev,"wuh_devon")
+
+M_dbcuh <- multiple_runs(nruns, 64, los_norm, los_cov, cov_curve, ndays,inc_rate = 7)
+plot_multple(M_dbcuh,"wuh_cuh")
+
+# EG
+output_dbwuh <- bed_filling(157, los_norm, los_cov, cov_curve,ndays=90)
+plot_eg(output_dbwuh, "dbwuh")
+
+output_wuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
+plot_eg(output_wuh, "wuh_devon")
+
+output_wuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
+plot_eg(output_wuh, "wuh_cuh")
+
+
+####****************************************************************************************************************
+####****************************************************************************************************************
+####****************************************************************************************************************
+####****************************************************************************************************************
+### HALVE RATE OF WUHAN
+## peak at 15 patients per day
+## peak remains flat 
+## Rate to increase halved
+cov_curve <- c(sigmoid(c(15,0.15,45),seq(1,90,1)))
+
+pdf("plots/scenarios_covid.pdf")
+plot(cov_curve,ylim=c(0,35),type="l",col="blue",xlab = "Days",ylab = "Daily incidence of COVID19 critical care cases")
+lines(sigmoid(c(15,0.3,30),seq(1,90,1)),col="black")
+lines(sigmoid(c(30,0.3,30),seq(1,90,1)),col="red")
+abline(v=c(30,60,90),col="grey")
+dev.off()
+
+M_slwuh <- multiple_runs(nruns, nbeds, los_norm, los_cov, cov_curve, ndays)
+plot_multple(M_slwuh,"wuh_ichnt")
+
+M_dbdev <- multiple_runs(nruns, 18, los_norm, los_cov, cov_curve, ndays,inc_rate = 1)
+plot_multple(M_dbdev,"wuh_devon")
+
+M_dbcuh <- multiple_runs(nruns, 64, los_norm, los_cov, cov_curve, ndays,inc_rate = 7)
+plot_multple(M_dbcuh,"wuh_cuh")
+
+# EG
+output_slwuh <- bed_filling(nbeds, los_norm, los_cov, cov_curve,ndays=90)
+plot_eg(output_slwuh, "slwuh")
+
+output_wuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 1)
+plot_eg(output_wuh, "wuh_devon")
+
+output_wuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,ndays=90, inc_rate = 7)
+plot_eg(output_wuh, "wuh_cuh")
+
+
+
+
+
+
+
+
 
 ####****************************************************************************************************************
 ####****************************************************************************************************************

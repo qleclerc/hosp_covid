@@ -5,13 +5,13 @@
 # cov_curve = changing NUMBER of patients that are covid+
 # inc_rate = ICNHT data
 
-bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, ndays = 90){
+bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, norm_curve, ndays = 90){
   
   ## Admissions 
   A <- as.data.frame(matrix(0,ndays,4))
   colnames(A) <- c("day","norm_admin","cov_admin","prop_cov")
   A[,"day"] <- seq(1,ndays,1)
-  A[,"norm_admin"] <- ceiling(rnorm(ndays,inc_rate,1)) #  depends on normal number of bed days / LOS of hospital
+  A[,"norm_admin"] <- ceiling(norm_curve) #ceiling(rnorm(ndays,inc_rate,1)) #  depends on normal number of bed days / LOS of hospital
   A[,"cov_admin"] <- ceiling(cov_curve)
   A[,"prop_cov"] <- A$cov_admin/(A$norm_admin + A$cov_admin)
   A0 <- A
@@ -57,11 +57,10 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
     
     while(cumlos < (ndays+1)){
       #print(cumlos)
-      
+      pat_num <- pat_num + 1 # Next patient
       ### COMPLICATED BY NEED TO HAVE PATIENTS TO ADMIT
       if(sum(A[cumlos,c("norm_admin","cov_admin")]) > 0){ # if there is a patient to be admitted
         #print(c(cumlos,pat_status))
-        pat_num <- pat_num + 1 # Next patient
         pat_status <- ifelse(runif(1) < A$prop_cov[cumlos],1,0) # 1 = COVID positive or not (0)?
         
         if(A[cumlos,(pat_status+2)] > 0){ # if there is a patient of this type to be admitted
@@ -109,6 +108,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
   Aleft <- A
   
   i = 1
+  #print(pat_num)
   # Extra beds needed
   while( sum(A$norm_admin + A$cov_admin) > 0){
     
@@ -116,9 +116,9 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
     WN[i,c("patno","status"),1] <- c(pat_num+1,3) # First day empty. A > 0 so will have a new patient to admit but not here and now
     
     while(cumlos < (ndays + 1)){
-    
+      #print(c("1",cumlos, pat_num,pat_status))
       pat_num <- pat_num + 1 # Next patient
-      
+      #  print(c("2",cumlos, pat_num,pat_status))
       ### COMPLICATED BY NEED TO HAVE PATIENTS TO ADMIT
       if(sum(A[cumlos,c("norm_admin","cov_admin")]) > 0){ # if there is a patient to be admitted
         #print(c(cumlos,pat_status))
@@ -149,7 +149,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
         pat_status <- 3 # EMPTY BED
         pat_num <- pat_num - 1 # No patient
       }
-      
+      # print(c("3",cumlos, pat_num,pat_status))
       # If empty bed don't store patient number 
       if(pat_status == 3){
         WN[i,c("patno","status"),pmin((cumlos + (1:los)),ndays)] <- c(0,pat_status) # this patient stays until end of los
@@ -158,7 +158,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
       }
       
       cumlos <- cumlos + los # next new patient at this time point
-      
+      # print(c("4",cumlos, pat_num,pat_status))
     }
     i = i + 1 # move on to next bed
     
@@ -171,7 +171,7 @@ bed_filling <- function(nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, nd
 
 ### Multiple runs
 
-multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate = 16.3, ndays = 90){
+multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate, ndays = 90){
   
   h_store<-c()
   missing_store <- c() #matrix(0,100*ndays,5)
@@ -181,7 +181,8 @@ multiple_runs <- function(nruns, nbeds, los_norm, los_cov, cov_curve, inc_rate =
   miss_covi <- c()
   
   for(j in 1:nruns){
-    output <- bed_filling(nbeds, los_norm, los_cov, cov_curve, inc_rate, ndays)
+    norm_curve <- rnorm(ndays,inc_rate,1)
+    output <- bed_filling(nbeds, los_norm, los_cov, cov_curve, norm_curve, ndays)
     
     h <- melt(output$WC,id.vars = "patno")
     colnames(h) <- c("bedno","variable","time","value")
@@ -243,7 +244,7 @@ sigmoid = function(params, x) {
 
 ## e.g.
 
-plot_eg <- function(output, name, inc_rate){
+plot_eg <- function(output, name, norm_curve){
   
   # Grab data
   # Basic time data to ndays days
@@ -261,13 +262,15 @@ plot_eg <- function(output, name, inc_rate){
   
   pcov <- as.data.frame(cbind(seq(1,length(cov_curve),1),cov_curve));
   colnames(pcov)<-c("days","cprev")
+  pcov$norm <- norm_curve
+  pcovm <- melt(pcov, id.vars = "days")
   
-  p2 <- ggplot(pcov, aes(x=days, y = cprev)) + geom_line() + 
-    scale_x_continuous("Day") + scale_y_continuous("COV19 prevelance at entry") +
+  p2 <- ggplot(pcovm, aes(x=days, y = value)) + geom_line(aes(group = variable)) + 
+    scale_x_continuous("Day") + scale_y_continuous("Number with COV19\non admin.") +
     geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed") + 
-    geom_hline(yintercept = inc_rate) + 
-    annotate(size = 2,'text',10, inc_rate+0.1, 
-             label=paste("Normal incidence rate (per day):",inc_rate))
+    geom_hline(yintercept = mean(norm_curve)) + 
+    annotate(size = 2,'text',10, round(mean(norm_curve)+0.1), 
+             label=paste("Mean Normal incidence rate (daily):",round(mean(norm_curve))))
   
   # Missing people
   miss <- melt(output$Aleft[,c("day","norm_admin","cov_admin")], id.vars = "day")
@@ -276,7 +279,7 @@ plot_eg <- function(output, name, inc_rate){
   p3 <- ggplot(miss, aes(fill=variable, y=value, x=day)) + 
     geom_bar(position="stack", stat="identity") + 
     scale_fill_manual(name  ="Status",values=c("norm_admin"="darkgreen","cov_admin" = "red"),labels=c("Normal", "Covid")) +
-    scale_y_continuous("Extra bed space needed per day") + 
+    scale_y_continuous("Extra bed space\nneeded per day") + 
     scale_x_continuous("Day") + 
     #annotate(size = 2,'text',90, 20, 
     # label=paste("Percentage of normal ICU burden treated:",perc_not_treat,"%"))+ 
@@ -304,7 +307,7 @@ plot_eg <- function(output, name, inc_rate){
   g <- ggplot(n, aes(x = time, y = bedno) ) + 
     geom_point(aes(col = factor(status))) + 
     scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
-    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,200)) +
+    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,350)) +
     annotate(size = 2,'text',10, 15, 
              label=paste("Extra beds needed:",mm)) +
     geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")

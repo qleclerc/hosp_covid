@@ -307,7 +307,7 @@ plot_eg <- function(output, name, norm_curve){
   g <- ggplot(n, aes(x = time, y = bedno) ) + 
     geom_point(aes(col = factor(status))) + 
     scale_colour_manual(name  ="Status",values = cols,breaks=c("0", "3","1"),labels=c("Normal", "Empty","Covid")) + 
-    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,350)) +
+    xlab("Day") + ylab("Bed number") + scale_y_continuous(lim=c(0,900)) +
     annotate(size = 2,'text',10, 15, 
              label=paste("Extra beds needed:",mm)) +
     geom_vline(xintercept = c(30,60,90),col="grey",lty = "dashed")

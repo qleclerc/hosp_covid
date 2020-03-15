@@ -221,3 +221,29 @@ plot_eg(output_wuh_devon2, "halfn_wuh_devon", norm_curve)
 norm_curve <- rnorm(ndays,7/2,1)
 output_wuh_cuh2 <- bed_filling(64, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
 plot_eg(output_wuh_cuh2, "halfn_wuh_cuh", norm_curve)
+
+#### Table of outputs
+
+names <- c("halfn_wuh_ichnt","halfn_wuh_devon","halfn_wuh_cuh")
+
+cc_store <- c()
+ff_store <- c()
+gg_store <- c()
+
+for(i in 1:length(names)){
+  cc <- read.csv(paste0("outputs/",names[i],"_missedpermonth.csv"))[,-1]
+  ff <- read.csv(paste0("outputs/",names[i],"_extrabed.csv"))[,-1]
+  gg <- read.csv(paste0("outputs/",names[i],"_totalmissed.csv"))[,-1]
+  
+  cc_store <- rbind(cc_store, cbind(names[i],cc))
+  ff_store <- rbind(ff_store, c(names[i],ff))
+  gg_store <- rbind(gg_store, c(names[i],gg))
+}
+
+cc_store <- as.data.frame(cc_store)
+ff_store <- as.data.frame(ff_store)
+gg_store <- as.data.frame(gg_store)
+colnames(cc_store) <- c("setting","month","mean_norm","mean_covid")
+colnames(ff_store) <- c("setting","mean_extra","sd_extra")
+colnames(gg_store) <- c("setting","mean_total_norm","sd_total_norm", "mean_total_covid","sd_total_covid")
+

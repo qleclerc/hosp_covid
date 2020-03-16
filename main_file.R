@@ -47,7 +47,7 @@ los_cov <- readRDS("delay_dist_linelist.rds") #sample(seq(1,length(x),1), size =
 
 cols <- c("3" = "lightblue", "1" = "red", "0" = "darkgreen")
 
-nruns = 100
+nruns = 10
 
 ndays = 90 # run for 3 months - so much uncertainty ahead
 
@@ -73,15 +73,15 @@ plot_multiple(M_wuhc,"wuh_cuh")
 # EG
 norm_curve <- rnorm(ndays,16.3,1)
 output_wuh <- bed_filling(nbeds, los_norm, los_cov, cov_curve,norm_curve, ndays=90)
-plot_eg(output_wuh, "wuh_ichnt", inc_rate = 16.3)
+plot_eg(output_wuh, "wuh_ichnt", norm_curve)
 
 norm_curve <- rnorm(ndays,1,1)
 output_wuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_wuh_devon, "wuh_devon", inc_rate = 1)
+plot_eg(output_wuh_devon, "wuh_devon", norm_curve)
 
 norm_curve <- rnorm(ndays,7,1)
 output_wuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_wuh_cuh, "wuh_cuh", inc_rate = 7)
+plot_eg(output_wuh_cuh, "wuh_cuh", norm_curve)
 
 
 ####****************************************************************************************************************
@@ -107,15 +107,15 @@ plot_multiple(M_dbcuh,"dbwuh_cuh")
 # EG
 norm_curve <- rnorm(ndays,16.3,1)
 output_dbwuh <- bed_filling(157, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_dbwuh, "dbwuh_ichnt", inc_rate = 16.3)
+plot_eg(output_dbwuh, "dbwuh_ichnt", norm_curve)
 
 norm_curve <- rnorm(ndays,1,1)
 output_dbwuh_devon <- bed_filling(18, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_dbwuh_devon, "dbwuh_devon", inc_rate = 1)
+plot_eg(output_dbwuh_devon, "dbwuh_devon", norm_curve)
 
 norm_curve <- rnorm(ndays,7,1)
 output_dbwuh_cuh <- bed_filling(64, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_dbwuh_cuh, "dbwuh_cuh", inc_rate = 7)
+plot_eg(output_dbwuh_cuh, "dbwuh_cuh", norm_curve)
 
 
 ####****************************************************************************************************************
@@ -148,15 +148,15 @@ plot_multiple(M_slcuh,"slwuh_cuh")
 # EG
 norm_curve <- rnorm(ndays,16.3,1)
 output_slwuh <- bed_filling(nbeds, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_slwuh, "slwuh_ichnt", inc_rate = 16.3)
+plot_eg(output_slwuh, "slwuh_ichnt", norm_curve)
 
 norm_curve <- rnorm(ndays,1,1)
 output_sldevon <- bed_filling(18, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_sldevon, "slwuh_devon", inc_rate = 1)
+plot_eg(output_sldevon, "slwuh_devon", norm_curve)
 
 norm_curve <- rnorm(ndays,7,1)
 output_slcuh <- bed_filling(64, los_norm, los_cov, cov_curve,norm_curve,ndays=90)
-plot_eg(output_slcuh, "slwuh_cuh", inc_rate = 7)
+plot_eg(output_slcuh, "slwuh_cuh", norm_curve)
 
 
 #### Table of outputs

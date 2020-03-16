@@ -274,7 +274,7 @@ plot_eg <- function(output, name, norm_curve){
   
   # Missing people
   miss <- melt(output$Aleft[,c("day","norm_admin","cov_admin")], id.vars = "day")
-  perc_not_treat <- round(100*output$pat_num/(output_nocovid$pat_num),0)
+  #perc_not_treat <- round(100*output$pat_num/(output_nocovid$pat_num),0)
   
   p3 <- ggplot(miss, aes(fill=variable, y=value, x=day)) + 
     geom_bar(position="stack", stat="identity") + 
